@@ -1,0 +1,7 @@
+rc_monitor.db
+cloudflared.exe
+cloudflared.log
+__pycache__/
+*.pyc
+.env
+.claude/

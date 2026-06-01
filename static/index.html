@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Šaltinių būsenos istorija</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f6f8fa;
+    color: #24292f;
+    min-height: 100vh;
+  }
+
+  header {
+    background: #24292f;
+    color: #fff;
+    padding: 24px 32px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  header h1 { font-size: 1.4rem; font-weight: 600; }
+  header p  { margin-top: 4px; font-size: 0.85rem; color: #8b949e; }
+
+  .lang-switcher {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .lang-btn {
+    background: transparent;
+    border: 1px solid #444d56;
+    color: #8b949e;
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .lang-btn.active {
+    background: #fff;
+    color: #24292f;
+    border-color: #fff;
+  }
+  .lang-btn:not(.active):hover {
+    background: #444d56;
+    color: #fff;
+  }
+
+  main { max-width: 900px; margin: 32px auto; padding: 0 16px; }
+
+  .banner {
+    border-radius: 8px;
+    padding: 14px 20px;
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .banner.ok   { background: #dafbe1; color: #1a7f37; border: 1px solid #aceebb; }
+  .banner.warn { background: #fff8c5; color: #9a6700; border: 1px solid #f0d742; }
+  .banner.down { background: #ffebe9; color: #cf222e; border: 1px solid #ff818266; }
+  .banner-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .banner.ok   .banner-dot { background: #1a7f37; }
+  .banner.warn .banner-dot { background: #9a6700; }
+  .banner.down .banner-dot { background: #cf222e; }
+
+  .card {
+    background: #fff;
+    border: 1px solid #d0d7de;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    padding: 14px 20px;
+  }
+
+  .register-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .reg-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    width: 150px;
+    flex-shrink: 0;
+  }
+
+  .status-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 12px;
+    width: 52px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .status-badge.up   { background: #dafbe1; color: #1a7f37; }
+  .status-badge.down { background: #ffebe9; color: #cf222e; }
+
+  .history-bar {
+    display: flex;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .slot {
+    flex: 1;
+    height: 28px;
+    border-radius: 2px;
+    position: relative;
+    cursor: default;
+  }
+  .slot.up      { background: #1a7f37; }
+  .slot.down    { background: #cf222e; }
+  .slot.partial { background: #e3b341; }
+  .slot.nodata  { background: #d0d7de; }
+
+  .slot:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #24292f;
+    color: #fff;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    padding: 4px 8px;
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .uptime-pct {
+    font-size: 0.8rem;
+    color: #57606a;
+    width: 48px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .history-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: #8b949e;
+    margin-top: 4px;
+    padding-left: 218px;
+    padding-right: 64px;
+  }
+
+  .loading { text-align: center; padding: 60px; color: #8b949e; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 id="t-title">Šaltinių būsenos istorija</h1>
+    <p id="last-check" data-i18n="loading"></p>
+  </div>
+  <div class="lang-switcher">
+    <button class="lang-btn active" onclick="setLang('lt')">LT</button>
+    <button class="lang-btn"        onclick="setLang('en')">EN</button>
+  </div>
+</header>
+
+<main>
+  <div id="banner" class="banner"><span class="banner-dot"></span><span id="banner-text"></span></div>
+  <div id="registers"><p class="loading" id="t-loading"></p></div>
+  <div class="history-labels">
+    <span id="label-start"></span>
+    <span id="t-48h"></span>
+    <span id="t-now"></span>
+  </div>
+</main>
+
+<script>
+const REFRESH_MS = 30_000;
+
+const I18N = {
+  lt: {
+    title:      'Šaltinių būsenos istorija',
+    loading:    'Kraunama...',
+    lastCheck:  (ts) => `Paskutinis patikrinimas: ${ts} (Vilniaus laikas)`,
+    bannerOk:   'Visos sistemos veikia normaliai',
+    bannerDown: 'Sistemos nepasiekiamos',
+    bannerWarn: (names) => `Trikdžiai: ${names}`,
+    noData:     'nėra duomenų',
+    uptime:     (pct) => `${pct}% veikė`,
+    h48:        '48h',
+    now:        'dabar',
+  },
+  en: {
+    title:      'Source Status History',
+    loading:    'Loading...',
+    lastCheck:  (ts) => `Last checked: ${ts} (Vilnius time)`,
+    bannerOk:   'All systems operational',
+    bannerDown: 'Systems unavailable',
+    bannerWarn: (names) => `Issues: ${names}`,
+    noData:     'no data',
+    uptime:     (pct) => `${pct}% uptime`,
+    h48:        '48h ago',
+    now:        'now',
+  },
+};
+
+const NAME_I18N = {
+  'Centre of Registers':    { lt: 'Registrų centras',          en: 'Centre of Registers' },
+  'PRDB Q1':                { lt: 'PRDB Q1',                   en: 'PRDB Q1' },
+  'SODRA':                  { lt: 'SODRA',                     en: 'SODRA' },
+  'Wanted persons registry':{ lt: 'Ieškomų asmenų registras',  en: 'Wanted persons registry' },
+};
+
+function displayName(key) {
+  return NAME_I18N[key]?.[lang] ?? key;
+}
+
+let lang        = localStorage.getItem('lang') || 'lt';
+let lastStatuses = null;
+let lastHistory  = null;
+let lastTs       = null;
+
+function setLang(l) {
+  lang = l;
+  localStorage.setItem('lang', l);
+  document.documentElement.lang = l;
+  document.querySelectorAll('.lang-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.toLowerCase() === l);
+  });
+  applyStaticI18n();
+  if (lastTs) renderLastCheck(lastTs);
+  if (lastStatuses && lastHistory) {
+    renderBanner(lastStatuses);
+    render(lastStatuses, lastHistory);
+  }
+}
+
+function applyStaticI18n() {
+  const tr = I18N[lang];
+  document.title = tr.title;
+  document.getElementById('t-title').textContent = tr.title;
+  document.getElementById('t-48h').textContent   = tr.h48;
+  document.getElementById('t-now').textContent   = tr.now;
+  // t-loading egzistuoja tik kol duomenys dar nekrauti
+  const loadingEl = document.getElementById('t-loading');
+  if (loadingEl) loadingEl.textContent = tr.loading;
+}
+
+function toVilniusTime(utcTs) {
+  const dt = new Date(utcTs.replace(' ', 'T') + 'Z');
+  return new Intl.DateTimeFormat(lang === 'lt' ? 'lt-LT' : 'en-GB', {
+    timeZone: 'Europe/Vilnius',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).format(dt);
+}
+
+function slotToVilnius(slotUtc) {
+  // slotUtc formatas: "2026-05-29T05:00"
+  const dt = new Date(slotUtc + ':00Z');
+  return new Intl.DateTimeFormat(lang === 'lt' ? 'lt-LT' : 'en-GB', {
+    timeZone: 'Europe/Vilnius',
+    month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+    hour12: false,
+  }).format(dt);
+}
+
+function renderLastCheck(utcTs) {
+  document.getElementById('last-check').textContent = t().lastCheck(toVilniusTime(utcTs));
+}
+
+function t() { return I18N[lang]; }
+
+function slotClass(pct) {
+  if (pct === null || pct === undefined) return 'nodata';
+  if (pct >= 90) return 'up';
+  if (pct >= 50) return 'partial';
+  return 'down';
+}
+
+function slotTip(slot, pct) {
+  const label = (pct === null || pct === undefined) ? t().noData : t().uptime(pct);
+  return `${slotToVilnius(slot)} — ${label}`;
+}
+
+function uptimePct(values) {
+  const known = values.filter(v => v !== null && v !== undefined);
+  if (!known.length) return null;
+  return (known.reduce((a, b) => a + b, 0) / known.length).toFixed(1);
+}
+
+function renderBanner(statuses) {
+  const banner = document.getElementById('banner');
+  const text   = document.getElementById('banner-text');
+  const allUp  = statuses.every(s => s.up);
+  const allDn  = statuses.every(s => !s.up);
+  if (allUp) {
+    banner.className = 'banner ok';
+    text.textContent = t().bannerOk;
+  } else if (allDn) {
+    banner.className = 'banner down';
+    text.textContent = t().bannerDown;
+  } else {
+    const down = statuses.filter(s => !s.up).map(s => s.name).join(', ');
+    banner.className = 'banner warn';
+    text.textContent = t().bannerWarn(down);
+  }
+}
+
+function render(statuses, history) {
+  const statusMap = Object.fromEntries(statuses.map(s => [s.name, s]));
+  const slots     = history.slots;
+  const registers = history.registers;
+
+  if (slots.length) {
+    document.getElementById('label-start').textContent = slotToVilnius(slots[0]);
+  }
+
+  const container = document.getElementById('registers');
+  container.innerHTML = '';
+
+  for (const [name, values] of Object.entries(registers)) {
+    const st  = statusMap[name];
+    const pct = uptimePct(values);
+
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const row = document.createElement('div');
+    row.className = 'register-row';
+
+    const nameEl = document.createElement('span');
+    nameEl.className   = 'reg-name';
+    nameEl.textContent = displayName(name);
+
+    const badge = document.createElement('span');
+    if (st) {
+      badge.className   = `status-badge ${st.up ? 'up' : 'down'}`;
+      badge.textContent = st.up ? 'UP' : 'DOWN';
+      if (!st.up) badge.title = st.error || `HTTP ${st.http_code}`;
+    } else {
+      badge.className   = 'status-badge';
+      badge.textContent = '?';
+    }
+
+    const bar = document.createElement('div');
+    bar.className = 'history-bar';
+    values.forEach((pct, i) => {
+      const slot = document.createElement('div');
+      slot.className = `slot ${slotClass(pct)}`;
+      slot.setAttribute('data-tip', slotTip(slots[i], pct));
+      bar.appendChild(slot);
+    });
+
+    const pctEl = document.createElement('span');
+    pctEl.className   = 'uptime-pct';
+    pctEl.textContent = pct !== null ? `${pct}%` : '–';
+
+    row.append(nameEl, badge, bar, pctEl);
+    card.appendChild(row);
+    container.appendChild(card);
+  }
+}
+
+async function refresh() {
+  try {
+    const [statuses, history] = await Promise.all([
+      fetch('/api/status').then(r => r.json()),
+      fetch('/api/history').then(r => r.json()),
+    ]);
+
+    if (statuses.length) {
+      lastStatuses = statuses;
+      lastHistory  = history;
+      lastTs       = statuses[0].ts?.replace('T', ' ') ?? '';
+      renderBanner(statuses);
+      render(statuses, history);
+      renderLastCheck(lastTs);
+    }
+  } catch (e) {
+    console.error('Refresh failed', e);
+  }
+}
+
+applyStaticI18n();
+refresh();
+setInterval(refresh, REFRESH_MS);
+</script>
+</body>
+</html>
