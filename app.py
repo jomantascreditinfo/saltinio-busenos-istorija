@@ -2,7 +2,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
@@ -30,6 +30,11 @@ async def _monitoring_loop() -> None:
 
 app = FastAPI(title="RC Monitor", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.api_route("/health", methods=["GET", "HEAD"], include_in_schema=False)
+async def health():
+    return Response(status_code=200)
 
 
 @app.get("/", include_in_schema=False)
