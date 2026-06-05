@@ -15,6 +15,7 @@ REGISTERS: list[Register] = [
     Register("PRDB Q1",                "https://api.creditinfo.lt/v1/bol/query-one/person"),
     Register("SODRA",                  "https://new.infobankas.lt/creditinfogroup_lt/saisws/sodrainfo.asmx?wsdl",                    expect="definitions"),
     Register("Wanted persons registry","https://new.infobankas.lt/creditinfogroup_lt/SAIS/WebServices/ieskomuasmenudb.asmx?wsdl",    expect="definitions"),
+    Register("IRD Invalid Papers",    "https://www.ird.lt/lt/invalidpapers",                                                           expect="negaliojančių"),
 ]
 
 
