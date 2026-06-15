@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -23,8 +24,15 @@ async def lifespan(app: FastAPI):
 
 async def _monitoring_loop() -> None:
     while True:
-        results = await run_checks()
-        await save_results(results)
+        try:
+            results = await run_checks()
+            await save_results(results)
+        except asyncio.CancelledError:
+            raise  # leidžiam korektiškai sustabdyti per shutdown
+        except Exception:
+            # Vienas blogas ciklas NEGALI užmušti viso loop'o (anksčiau būtent
+            # tai įšaldydavo duomenis). Klaidą paliekam Render log'uose.
+            traceback.print_exc()
         await asyncio.sleep(INTERVAL)
 
 

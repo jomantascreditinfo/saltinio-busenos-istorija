@@ -39,6 +39,10 @@ async def check_one(client: httpx.AsyncClient, reg: Register) -> Result:
         return Result(reg.name, False, error="timeout")
     except httpx.ConnectError:
         return Result(reg.name, False, error="unreachable")
+    except Exception as e:
+        # Bet kokia kita klaida (SSL, RemoteProtocolError, ReadError, ...) =
+        # registras laikomas neveikiančiu, bet patikra NETrūkinama.
+        return Result(reg.name, False, error=type(e).__name__)
 
 
 async def run_checks() -> list[Result]:
